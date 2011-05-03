@@ -3,4 +3,5 @@
 /tags
 /.vimproject
 /*.tar.gz
-/.screen-buffer.rb
+i/.screen-buffer.rb
+*.swp

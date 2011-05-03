@@ -2,24 +2,25 @@
 require 'fileutils'
 require 'tempfile'
 
-require 'spec/spec_helper'
-
-require 'vlh/repository'
-require 'vlh/lang_utils'
-require 'vlh/errors'
+require File.expand_path(File.dirname(__FILE__) + "/spec_helper") 
+require File.expand_path(File.dirname(__FILE__) + "/../src/vlh/repository")
+require File.expand_path(File.dirname(__FILE__) + "/../src/vlh/lang_utils")
+require File.expand_path(File.dirname(__FILE__) + "/../src/vlh/errors")
 
 
 describe VimLocalHistory::Repository do
 	include VimLocalHistory::SpecHelper
-
-
 	before(:each) do
-		FileUtils.rm_r ['./test/without-repo', './test/with-repo'], 
+
+          
+  @sample_file = File.expand_path(File.dirname(__FILE__) + "/assets/sample_file.txt")   
+          
+          FileUtils.rm_r ['./test/without-repo', './test/with-repo'], 
 						:force => true
 		FileUtils.mkdir_p ['./test/without-repo', './test/with-repo']
 		
 		system 'cd test/with-repo && touch .gitignore && 
-				git-init > /dev/null && git add .gitignore && 
+				git init > /dev/null && git add .gitignore && 
 				git commit --all -m "Initial Commit" > /dev/null'
 	end
 
@@ -72,7 +73,7 @@ describe VimLocalHistory::Repository do
 		end
 
 		it "should raise an error when asked to commit a file" do
-			lambda{ @repo.commit_file('./spec/assets/sample_file.txt') }.
+			lambda{ @repo.commit_file(@sample_file) }.
 				should raise_error(CannotInitializeRepositoryError)
 		end
 	end
@@ -81,11 +82,11 @@ describe VimLocalHistory::Repository do
 	shared_examples_for "with a valid g:vlh_repository_dir" do
 		before(:each) do
 			@temp = Tempfile.new('vlh-spec').path
-			FileUtils.cp './spec/assets/sample_file.txt', @temp
+			FileUtils.cp @sample_file, @temp
 		end
 
 		after(:each) do
-			FileUtils.cp @temp, './spec/assets/sample_file.txt'
+			FileUtils.cp @temp, @sample_file
 		end
 
 
@@ -95,30 +96,30 @@ describe VimLocalHistory::Repository do
 
 		it "should have one commit entry for a new file, after being asked to
 		commit that file".compact! do
-			@repo.commit_file './spec/assets/sample_file.txt'
+			@repo.commit_file @sample_file
 
-			git_revs( @repo.location, './spec/assets/sample_file.txt').
+			git_revs( @repo.location, @sample_file).
 				should have_exactly(1).commits
 		end
 
 		it "should treat paths with . and .. as referring to the same file as if
 		the path were realpath stripped".compact! do
 
-			@repo.commit_file './spec/assets/sample_file.txt'
-			change_file './spec/assets/sample_file.txt'
+			@repo.commit_file @sample_file
+			change_file @sample_file
 			@repo.commit_file './spec/assets/../../spec/assets/./sample_file.txt'
 
-			git_revs( @repo.location, './spec/assets/sample_file.txt').
+			git_revs( @repo.location, @sample_file).
 				should have_exactly(2).commits
 		end
 
 		it "should treat a path symlinked to some other path as separate 
 		paths".compact! do
-			@repo.commit_file './spec/assets/sample_file.txt'
-			change_file './spec/assets/sample_file.txt'
+			@repo.commit_file @sample_file
+			change_file @sample_file
 			@repo.commit_file './spec/assets/sample_file_symlink'
 
-			git_revs( @repo.location, './spec/assets/sample_file.txt').
+			git_revs( @repo.location, @sample_file).
 				should have_exactly(1).commits
 			git_revs( @repo.location, './spec/assets/sample_file_symlink').
 				should have_exactly(1).commits
@@ -133,7 +134,7 @@ describe VimLocalHistory::Repository do
 		end
 
 		it "should store absolute paths rooted at the repository location" do
-			FileUtils.cp './spec/assets/sample_file.txt', '/tmp/sample_file.txt'
+			FileUtils.cp @sample_file, '/tmp/sample_file.txt'
 			@repo.commit_file '/tmp/sample_file.txt'
 			
 			git_revs( @repo.location, '/tmp/sample_file.txt').
@@ -143,11 +144,11 @@ describe VimLocalHistory::Repository do
 		it "should store relative paths rooted at the repository location from
 		their absolute path (i.e. saving ./foo should be the same as saving
 		realpath ./foo)".compact! do
-			@repo.commit_file './spec/assets/sample_file.txt'
+			@repo.commit_file @sample_file
 
 			git_revs( 
 				@repo.location, 
-				File.expand_path('./spec/assets/sample_file.txt')
+				File.expand_path(@sample_file)
 			).should have_exactly(1).commits
 		end
 
@@ -166,7 +167,7 @@ describe VimLocalHistory::Repository do
 			stat_pwd = File.stat FileUtils.pwd
 			File.chown stat_pwd.uid, stat_pwd.gid, @repo.location
 
-			@repo.commit_file './spec/assets/sample_file.txt'
+			@repo.commit_file @sample_file
 
 			stat_repo = File.stat @repo.location
 			stat_file = File.stat(
@@ -179,7 +180,7 @@ describe VimLocalHistory::Repository do
 
 		it "should warn about an unimplemented feature if asked to commit an
 		scp'd file".compact! do
-			path = scp_path './spec/assets/sample_file.txt'
+			path = scp_path @sample_file
 
 			lambda{ 
 				@repo.commit_file path
@@ -376,7 +377,7 @@ describe VimLocalHistory::Repository do
 
 		it "should initialize the git repository when first asked to commit a
 		file".compact! do 
-			@repo.commit_file('./spec/assets/sample_file.txt')
+			@repo.commit_file(@sample_file)
 			File.should be_exist('./test/without-repo/.git')
 		end
 	end
@@ -398,7 +399,7 @@ describe VimLocalHistory::Repository do
 		it "should not change the repository when asked to commit an scp'd
 		file".compact! do
 			starting_rev = git_rev_head( @repo.location)
-			path = scp_path './spec/assets/sample_file.txt'
+			path = scp_path @sample_file
 
 			begin
 				@repo.commit_file path
@@ -525,7 +526,7 @@ describe VimLocalHistory::Repository do
 				:log => './test/log',
 			})
 			@temp = Tempfile.new('vlh-spec').path
-			FileUtils.cp './spec/assets/sample_file.txt', @temp
+			FileUtils.cp @sample_file, @temp
 
 			# Revisions are written in reverse -- we're thinking of revision
 			# here as relative to the current file, with rev 0 being the current
@@ -539,7 +540,7 @@ describe VimLocalHistory::Repository do
 		end
 
 		after(:each) do
-			FileUtils.cp @temp, './spec/assets/sample_file.txt'
+			FileUtils.cp @temp, @sample_file
 		end
 
 
@@ -595,7 +596,7 @@ describe VimLocalHistory::Repository do
 				rv.should be_equal(true)
 				File.read('spec/assets/sample_file.txt').should == 'revision 1'
 				
-				git_revs( @repo.location, './spec/assets/sample_file.txt').
+				git_revs( @repo.location, @sample_file).
 					should have_exactly(5).commits
 			end
 
@@ -607,7 +608,7 @@ describe VimLocalHistory::Repository do
 				rv.should be_equal(true)
 				File.read('spec/assets/sample_file.txt').should == 'revision 3'
 
-				git_revs( @repo.location, './spec/assets/sample_file.txt').
+				git_revs( @repo.location, @sample_file).
 					should have_exactly(5).commits
 			end
 
@@ -618,7 +619,7 @@ describe VimLocalHistory::Repository do
 				rv.should be_equal(false)
 				File.read('spec/assets/sample_file.txt').should == 'revision 0'
 
-				git_revs( @repo.location, './spec/assets/sample_file.txt').
+				git_revs( @repo.location, @sample_file).
 					should have_exactly(4).commits
 			end
 
@@ -629,7 +630,7 @@ describe VimLocalHistory::Repository do
 				rv.should be_equal(false)
 				File.read('spec/assets/sample_file.txt').should == 'revision 0'
 
-				git_revs( @repo.location, './spec/assets/sample_file.txt').
+				git_revs( @repo.location, @sample_file).
 					should have_exactly(4).commits
 			end
 
@@ -640,7 +641,7 @@ describe VimLocalHistory::Repository do
 				rv.should be_equal(false)
 				File.read('spec/assets/sample_file.txt').should == 'revision 0'
 
-				git_revs( @repo.location, './spec/assets/sample_file.txt').
+				git_revs( @repo.location, @sample_file).
 					should have_exactly(4).commits
 			end
 

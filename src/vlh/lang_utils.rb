@@ -1,5 +1,5 @@
 # coding: utf-8
-require 'vlh/errors'
+require File.expand_path(File.dirname(__FILE__) + "/../vlh/errors")
 
 
 class String
